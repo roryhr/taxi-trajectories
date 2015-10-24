@@ -8,9 +8,8 @@ Created on Fri Oct 23 19:02:14 2015
 import pandas as pd
 import numpy as np
 import os 
-
-
 from math import radians, cos, sin, asin, sqrt
+import matplotlib.pyplot as plt
 
 def haversine(lon1, lat1, lon2, lat2):
     """
@@ -49,8 +48,8 @@ for index, file_path in enumerate(full_files):
             header=None, parse_dates = [1],\
             names = ['taxi_id', 'date_time', 'longitude', 'latitude'])
     frames.append(data)
-    print file_path
-    print data.describe()
+#    print file_path
+#    print data.describe()
 
     
     
@@ -82,4 +81,8 @@ time_diffs[(time_diffs > 0) & (time_diffs < 12)].hist(bins = 20)#x = data.groupb
 #
 #x = data.date_time.diff()/np.timedelta64(1,'s')
 #
-#x.hist()
+#%% Plotting -- plots a normed histogram of proportions summing to 1
+
+hist, bins = np.histogram(time_diffs[(time_diffs > 0) & \
+            (time_diffs < 12)].astype(np.ndarray), bins=20)
+plt.bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
