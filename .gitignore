@@ -2,3 +2,6 @@
 .ipynb_checkpoints/
 *.xlsx
 /data
+
+# Only upload 1 folder of data
+!/data/01
