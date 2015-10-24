@@ -1,0 +1,4 @@
+*.nogit
+.ipynb_checkpoints/
+*.xlsx
+/data
