@@ -1,4 +1,4 @@
-## T-Drive Data Challenge 
+# T-Drive Data Challenge 
 
 http://startup.ml/challenge/
 
@@ -9,7 +9,7 @@ Sampling each taxi's location every 177 seconds.
 http://research.microsoft.com/apps/pubs/?id=152883
 
 
-# Publications
+## Reference Publications
 
 [1] Jing Yuan, Yu Zheng, Xing Xie, and Guangzhong Sun. Driving with knowledge
 from the physical world. In The 17th ACM SIGKDD international conference on
