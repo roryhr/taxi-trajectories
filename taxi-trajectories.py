@@ -43,6 +43,16 @@ def haversine(lon1, lat1, lon2, lat2):
     c = 2 * np.arcsin(np.sqrt(a)) 
     r = 6371  # Radius of earth in kilometers. Use 3956 for miles
     return c * r * 1000     # convert to meters
+    
+    
+def my_low_pass_filter(array):
+    freqs = np.fft.fft(array)
+    half_way = int(freqs.size/2)
+    ten_percent = int(freqs.size/10)
+    
+    freqs[(half_way-ten_percent):(half_way+ten_percent)]
+    return np.fft.ifft(freqs)
+
 
 #%% Read in data
 def get_files(direc):
@@ -56,7 +66,7 @@ def get_files(direc):
     return full_files
     
     
-full_files = get_files('data')
+full_files = get_files('data/02')
 
 #%% Read in the data 
 print "Reading in the .txt files..."
@@ -103,24 +113,31 @@ lat2 = np.array(data.latitude[1:-1])
 distances = haversine(lon1, lat1, lon2, lat2)
 
 
-#%% Plotting -- plots a normed histogram of proportions summing to 1
+#%% Plotting: Time -- plots a histogram time intervals with 
+#                     proportions summing to 1
 print "Plotting time intervals..."
-plt.figure
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10,5))
+#fig = plt.figure(figsize = (8,4))
+#fig.set_figure_width(6)
+axes[0].set_xlabel('Interval (minutes)')
+axes[0].set_ylabel('Frequency (proportion)')
+axes[0].set_title('Time Intervals')
+
 hist, bins = np.histogram(time_diffs[(time_diffs > 0) & \
             (time_diffs < 12)].astype(np.ndarray), bins=20)
-plt.bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
+axes[0].bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
 
-
-#%% Plotting -- Distance -- plots a normed histogram of proportions summing to 1
-plt.figure
+#% Plotting: Distance -- plots a normed histogram of distance intervals
 distances = pd.Series(distances)
 distances.dropna(inplace=True)
 
 hist, bins = np.histogram(distances[(distances > 0) & \
             (distances < 8000)].astype(np.ndarray), bins=20)
-plt.bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
+axes[1].bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
+axes[1].set_xlabel('Distance (meters)')
+axes[1].set_ylabel('Frequency (proportion)')
 
-
+fig.tight_layout()
 
 #%% Plot position density 
 print "Plotting position density..."
@@ -178,4 +195,17 @@ cb = plt.colorbar()
 
 cb.set_label('Number of points (log10)')
 
+plt.show()
+
+
+#%% Select data for one taxi
+one_taxi = data[data.taxi_id == 2172]
+
+
+#plt.figure(figsize = (12,8), dpi=100)
+
+#%% Plot
+plt.plot(np.array(one_taxi.longitude), np.array(one_taxi.latitude))
+plt.axis([xmin, xmax, ymin, ymax])
+plt.title("Traffic data for Beijing -- 5th Ring Road")
 plt.show()
