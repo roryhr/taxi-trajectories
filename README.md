@@ -1,5 +1,9 @@
 # T-Drive Data Challenge 
 
+Read the iPython Notebook online
+
+http://nbviewer.jupyter.org/github/roryhr/taxi-trajectories/blob/master/taxi-data-notebook.ipynb
+
 http://startup.ml/challenge/
 
 In Beijing, Microsoft collected GPS data from 10,357 taxis. 
