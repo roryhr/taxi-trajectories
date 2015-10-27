@@ -28,11 +28,9 @@ def haversine(lon1, lat1, lon2, lat2):
     Most lat/lon points are closely spaced. Can implement small angle approx 
     to improve speed.
     """
-    # convert decimal degrees to radians 
     
-#    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-    
-    lon1 *= np.pi/180  # Convert from degrees to radians
+    # Convert from degrees to radians
+    lon1 *= np.pi/180  
     lon2 *= np.pi/180
     lat1 *= np.pi/180
     lat2 *= np.pi/180    
@@ -44,75 +42,96 @@ def haversine(lon1, lat1, lon2, lat2):
     c = 2 * np.arcsin(np.sqrt(a)) 
     r = 6371  # Radius of earth in kilometers. Use 3956 for miles
     return c * r * 1000     # convert to meters
-    
-    
-def my_low_pass_filter(array):
-    freqs = np.fft.fft(array)
-    half_way = int(freqs.size/2)
-    ten_percent = int(freqs.size/10)
-    
-    freqs[(half_way-2*ten_percent):(half_way+2*ten_percent)] = 0
-    return np.fft.ifft(freqs)
 
+#%%
+def pythagoras(lat_in, lon_in):
+    lat = np.array(lat_in)
+    lon = np.array(lon_in)
+    
+    lat *= np.pi/180
+    lon *= np.pi/180
+    
+    lon1 = lon[0:-1]
+    lon2 = lon[1:]
+    
+    lat1 = lat[0:-1]
+    lat2 = lat[1:]
+    
+    x = (lon2-lon1) * np.cos((lat1+lat2)/2)
+    y = lat2-lat1
+    
+    d = np.sqrt(x**2 + y**2) * 6371*1000
+    return d
 
-#%% Read in data
+#%% Function that return a list of files to read in a given folder
 def get_files(direc):
+    full_files = []
     for root, dirs, files in os.walk(direc):
-        files = files
-        
-    full_files = []    
-    for fi in files:
-        full_files.append(os.path.join(root, fi))
+        for name in files:
+            full_files.append(os.path.join(root, name))
         
     return full_files
     
-    
-full_files = get_files('data/02')
 
-#%% Read in the data 
+#%% Read in data 
+
+#full_files = ['data/012/15.txt']        # 1 file:  50 KB
+#full_files = get_files('data/012')      # 1 folder:  30-50 MB
+full_files = get_files('data')          # All folders  700 MB
+
+
 print "Reading in the .txt files..."
-frames = []
+
+data = []
 for index, file_path in enumerate(full_files):
-    data = pd.read_csv(file_path, infer_datetime_format=True,\
+#    data = data.append(pd.read_csv(file_path, infer_datetime_format=True,\
+#            header=None, parse_dates = [1],\
+#            names = ['taxi_id', 'date_time', 'longitude', 'latitude']), \
+#            ignore_index = True)
+
+    data.append(pd.read_csv(file_path, infer_datetime_format=True,\
             header=None, parse_dates = [1],\
-            names = ['taxi_id', 'date_time', 'longitude', 'latitude'])
-    frames.append(data)
-#    print file_path
-#    print data.describe()
+            names = ['taxi_id', 'date_time', 'longitude', 'latitude']))
 
-data = pd.concat(frames)
-del frames, index
-
-grouped = data.groupby('taxi_id')['date_time']
+data = pd.concat(data, ignore_index=True)
 
 
 #%% Compute Time Intervals
 print "Computing time intervals..."
-times = []
-for g in grouped:
-    times.append(g[1].diff())
-#    print pd.Series(g[1].diff())
-#    time_diffs.append(pd.Series(g[1].diff()))
+grouped = data.sort('date_time').groupby('taxi_id')['date_time']
+
+time_intervals = []
+for group_id, times in grouped:
+#    times.sort(inplace=True)
+    time_intervals.append(times.diff())
     
-time_diffs = pd.Series()
-time_diffs = pd.concat(times)
-time_diffs /= np.timedelta64(1,'s') # Divide by 1 second, for float64 data
+time_intervals = pd.concat(time_intervals)
+time_intervals.dropna(inplace=True)
+time_intervals /= np.timedelta64(1,'s') # Divide by 1 second, for float64 data
 
-time_diffs.dropna()
 
-time_diffs /= 60    # Convert to minutes
-#time_diffs[(time_diffs > 0) & (time_diffs < 12)].hist(bins = 20)#x = data.groupby(by='taxi_id').date_time.diff()
+print "Average sample interval: %.0f secs" % time_intervals[time_intervals < 1e4].mean()
+time_intervals /= 60    # Convert to minutes
 
 
 #%% Compute Distance Intervals
 print "Computing distance intervals..."
-lon1 = np.array(data.longitude[0:-2])
-lon2 = np.array(data.longitude[1:-1])
-lat1 = np.array(data.latitude[0:-2])
-lat2 = np.array(data.latitude[1:-1])
+grouped = data.sort('date_time').groupby('taxi_id')
 
-distances = haversine(lon1, lat1, lon2, lat2)
+distances = []
+for g in grouped:
+    # Distances are given in meters
+#    g[1].sort(columns = 'date_time', inplace=True)
+    distances.append(pd.DataFrame(pythagoras(g[1].latitude.values, \
+                                            g[1].longitude.values)))
 
+distances = pd.concat(distances)
+
+print "Total trajectory distance: %.0f million km" % \
+                (distances[distances[0] < 1e5][0].sum()/1e9)
+
+print "Average distance between samples: %.0f m" % \
+                (distances[(distances[0] < 1e5)][0].mean())
 
 #%% Plotting: Time -- plots a histogram time intervals with 
 #                     proportions summing to 1
@@ -124,16 +143,19 @@ axes[0].set_xlabel('Interval (minutes)')
 axes[0].set_ylabel('Frequency (proportion)')
 axes[0].set_title('Time Intervals')
 
-hist, bins = np.histogram(time_diffs[(time_diffs > 0) & \
-            (time_diffs < 12)].astype(np.ndarray), bins=20)
+hist, bins = np.histogram(time_intervals[(time_intervals > 0) & \
+            (time_intervals < 12)].astype(np.ndarray), bins=20)
 axes[0].bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
 
 #% Plotting: Distance -- plots a normed histogram of distance intervals
-distances = pd.Series(distances)
+#distances = pd.Series(distances)
 distances.dropna(inplace=True)
 
-hist, bins = np.histogram(distances[(distances > 0) & \
-            (distances < 8000)].astype(np.ndarray), bins=20)
+#hist, bins = np.histogram(distances[(distances > 0) & \
+#            (distances < 8000)].astype(np.ndarray), bins=20)
+hist, bins = np.histogram(distances[(distances[0] < 8000) & \
+                        (distances[0] > 0)][0].values, bins=20)
+
 axes[1].bar(bins[:-1], hist.astype(np.float32) / hist.sum(), width=(bins[1]-bins[0]))
 axes[1].set_xlabel('Distance (meters)')
 axes[1].set_ylabel('Frequency (proportion)')
@@ -153,7 +175,7 @@ window = data[(xmin < data.longitude) & (data.longitude < xmax) & \
 x = np.array(window.longitude)
 y = np.array(window.latitude)
 
-plt.figure(figsize = (10,7), dpi=200)
+plt.figure(figsize = (10,7), dpi=150)
 plt.hexbin(x,y,bins='log', gridsize=800, cmap=plt.cm.hot)   # black -> red > white
 plt.axis([xmin, xmax, ymin, ymax])
 plt.title("Traffic data over Beijing")
@@ -163,6 +185,7 @@ plt.ylabel('Latitude (degrees)')
 cb = plt.colorbar(format=LogFormatterHB())
 cb.set_label('Number of points')
 
+plt.tight_layout()
 plt.show()
 
 #%% Make the 5th Ring Road Beijing
@@ -177,7 +200,7 @@ window = data[(xmin < data.longitude) & (data.longitude < xmax) & \
 x = np.array(window.longitude)
 y = np.array(window.latitude)
 
-plt.figure(figsize = (10,6), dpi=150)
+plt.figure(figsize = (10,7), dpi=150)
 plt.hexbin(x,y, bins='log', gridsize=800, cmap=plt.cm.hot)   # black -> red > white
 plt.axis([xmin, xmax, ymin, ymax])
 plt.title("Traffic data for Beijing's 5th Ring Road")
@@ -192,30 +215,19 @@ plt.show()
 
 
 #%% Select data for one taxi
-one_taxi = data[data.taxi_id == 2172]
+one_taxi = data[data.taxi_id == data.taxi_id[100]]
 
-
-
-
-
-#plt.figure(figsize = (12,8), dpi=100)
-
-#%% Plot
-plt.plot(my_low_pass_filter(np.array(one_taxi.longitude)),\
-        my_low_pass_filter(np.array(one_taxi.latitude)))
-plt.axis([xmin, xmax, ymin, ymax])
-plt.title("Traffic data for Beijing -- 5th Ring Road")
-plt.show()
 
 #%% Kalman Filter and plot results
 
 #kf = KalmanFilter(transition_matrices = [[1, 1], [0, 1]], observation_matrices = [[0.1, 0.5], [-0.3, 0.0]])
 #kf = KalmanFilter(transition_matrices = [[1, 0], [0, 1]], observation_matrices = [[0.1, 0.5], [-0.3, 0.0]], n_dim_obs=2, n_dim_state=2)
+end_index = 200
+
 measurements = np.asarray([one_taxi.longitude, one_taxi.latitude])
-measurements = measurements.T[0:400]
+measurements = measurements.T[0:end_index]
 kf = KalmanFilter(initial_state_mean = measurements[0], \
            n_dim_obs=2, n_dim_state=2)
-
 
 kf = kf.em(measurements)
 #(filtered_state_means, filtered_state_covariances) = kf.filter(measurements)
@@ -226,8 +238,8 @@ plt.plot(smoothed_state_means.T[0],smoothed_state_means.T[1])
 plt.title("Smoothed Data With Karman Filter")
 plt.xlabel('Longitude (degrees)')
 plt.ylabel('Latitude (degrees)')
-print "Taxi data for Taxi ID: ", 2172
+print "Taxi data for Taxi ID: ", data.taxi_id[0]
 print "Start date and time: ", one_taxi.date_time[0]
-print "Duration :", one_taxi.date_time[400] - one_taxi.date_time[0]
+print "Duration :", one_taxi.date_time[end_index] - one_taxi.date_time[0]
 plt.figure()
 #plt.plot(measurements.T[0],measurements.T[1])
