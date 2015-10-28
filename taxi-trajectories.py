@@ -19,30 +19,6 @@ class LogFormatterHB(LogFormatter):
          vv = self._base ** v
          return LogFormatter.__call__(self, vv, pos) 
 
-#%% Haversine formula
-def haversine(lon1, lat1, lon2, lat2):
-    """
-    Calculate the great circle distance between two points 
-    on the earth (specified in decimal degrees)
-    
-    Most lat/lon points are closely spaced. Can implement small angle approx 
-    to improve speed.
-    """
-    
-    # Convert from degrees to radians
-    lon1 *= np.pi/180  
-    lon2 *= np.pi/180
-    lat1 *= np.pi/180
-    lat2 *= np.pi/180    
-    
-    # haversine formula 
-    dlon = lon2 - lon1 
-    dlat = lat2 - lat1 
-    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
-    c = 2 * np.arcsin(np.sqrt(a)) 
-    r = 6371  # Radius of earth in kilometers. Use 3956 for miles
-    return c * r * 1000     # convert to meters
-
 #%%
 def pythagoras(lat_in, lon_in):
     lat = np.array(lat_in)
@@ -95,6 +71,8 @@ for index, file_path in enumerate(full_files):
 
 data = pd.concat(data, ignore_index=True)
 
+print "Size of data frame: ", data.shape
+print "%.1f million rows" % (data.shape[0]/1.0e6)
 
 #%% Compute Time Intervals
 print "Computing time intervals..."
